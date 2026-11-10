@@ -27,14 +27,27 @@ jobs:
             flutter create . --platforms=android --project-name mahalli --org iq.mahalli
           fi
           MANIFEST=android/app/src/main/AndroidManifest.xml
-          grep -q "android.permission.CAMERA" $MANIFEST || \
-            sed -i '0,/<application/s//<uses-permission android:name="android.permission.CAMERA"\/>\n    <application/' $MANIFEST
+          for P in CAMERA INTERNET ACCESS_NETWORK_STATE; do
+            grep -q "android.permission.$P" $MANIFEST || \
+              sed -i "0,/<application/s//<uses-permission android:name=\"android.permission.$P\"\/>\n    <application/" $MANIFEST
+          done
           sed -i 's/android:label="[^"]*"/android:label="محلي"/' $MANIFEST
+          # Firebase يتطلب minSdk 23 على الأقل
+          sed -i 's/flutter\.minSdkVersion/23/' android/app/build.gradle* || true
 
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
-      - run: flutter build apk --release
+
+      - name: Build release APK
+        run: |
+          flutter build apk --release \
+            --dart-define=FB_API_KEY=${{ secrets.FB_API_KEY }} \
+            --dart-define=FB_APP_ID=${{ secrets.FB_APP_ID }} \
+            --dart-define=FB_SENDER_ID=${{ secrets.FB_SENDER_ID }} \
+            --dart-define=FB_PROJECT_ID=${{ secrets.FB_PROJECT_ID }} \
+            --dart-define=FB_STORAGE_BUCKET=${{ secrets.FB_STORAGE_BUCKET }} \
+            --dart-define=SUPPORT_WHATSAPP=${{ secrets.SUPPORT_WHATSAPP }}
 
       - uses: actions/upload-artifact@v4
         with:
