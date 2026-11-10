@@ -7,6 +7,7 @@ import '../../core/units.dart';
 import '../barcode/scan_screen.dart';
 import '../products/products_screen.dart';
 import '../providers.dart';
+import '../settings/more_screen.dart';
 
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key});
@@ -14,7 +15,12 @@ class HomeShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tab = ref.watch(tabProvider);
-    const pages = [DashboardPage(), ProductsScreen(), ScanScreen()];
+    const pages = [
+      DashboardPage(),
+      ProductsScreen(),
+      ScanScreen(),
+      MoreScreen(),
+    ];
     return Scaffold(
       body: SafeArea(child: pages[tab]),
       bottomNavigationBar: NavigationBar(
@@ -31,6 +37,8 @@ class HomeShell extends ConsumerWidget {
               label: 'المنتجات'),
           NavigationDestination(
               icon: Icon(Icons.qr_code_scanner), label: 'مسح'),
+          NavigationDestination(
+              icon: Icon(Icons.more_horiz), label: 'المزيد'),
         ],
       ),
     );
