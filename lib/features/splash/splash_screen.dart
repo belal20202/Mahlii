@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/firebase_config.dart';
 import '../../core/theme.dart';
-import '../home/home_shell.dart';
+import '../auth/auth_gate.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -22,10 +23,11 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     Future.delayed(const Duration(milliseconds: 2400), () {
       if (!mounted) return;
-      // المرحلة 2: الانتقال إلى تسجيل الدخول بدلاً من الرئيسية
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const HomeShell(),
+          pageBuilder: (_, __, ___) => FirebaseConfig.ready
+              ? const AuthGate()
+              : const SetupRequiredScreen(),
           transitionsBuilder: (_, a, __, child) =>
               FadeTransition(opacity: a, child: child),
         ),
