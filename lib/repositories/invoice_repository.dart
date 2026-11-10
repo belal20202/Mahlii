@@ -10,6 +10,7 @@ class InsufficientStockException implements Exception {
   InsufficientStockException(this.productName);
 }
 
+/// كل العمليات نقدية: المدفوع = الإجمالي دائماً.
 class InvoiceRepository {
   int get _now => DateTime.now().millisecondsSinceEpoch;
 
@@ -17,8 +18,8 @@ class InvoiceRepository {
 
   static String _opId() {
     final r = Random.secure();
-    return List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0'))
-        .join();
+    return List.generate(
+        16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
   }
 
   Future<int> _next(DatabaseExecutor ex, String key) async {
@@ -38,13 +39,10 @@ class InvoiceRepository {
         'created_at': _now,
       });
 
-  // ---------------- البيع ----------------
+  // ---------------- البيع (نقدي) ----------------
   Future<Invoice> createSale({
     required List<CartLine> lines,
     required int discount,
-    required String method, // cash | credit | partial
-    required int paid,
-    String? customer,
     required String userName,
   }) async {
     final db = await AppDb.get();
@@ -69,9 +67,6 @@ class InvoiceRepository {
       final subtotal = lines.fold<int>(0, (s, l) => s + l.total);
       final disc = _clamp(discount, 0, subtotal);
       final total = subtotal - disc;
-      final paidAmt = method == 'cash'
-          ? total
-          : (method == 'credit' ? 0 : _clamp(paid, 0, total));
       var cogs = 0;
       for (final l in lines) {
         cogs += l.pieces * cost[l.product.id!]!;
@@ -83,15 +78,13 @@ class InvoiceRepository {
         'op_id': _opId(),
         'number': number,
         'type': 'sale',
-        'party': (customer == null || customer.trim().isEmpty)
-            ? null
-            : customer.trim(),
+        'party': null,
         'user_name': userName,
         'subtotal': subtotal,
         'discount': disc,
         'total': total,
-        'paid': paidAmt,
-        'payment_method': method,
+        'paid': total,
+        'payment_method': 'cash',
         'cogs': cogs,
         'status': 'completed',
         'created_at': _now,
@@ -127,11 +120,10 @@ class InvoiceRepository {
     });
   }
 
-  // ---------------- الشراء ----------------
+  // ---------------- الشراء من مورد (نقدي) ----------------
   Future<Invoice> createPurchase({
     required List<CartLine> lines,
     required int discount,
-    required int paid,
     required String supplier,
     required String userName,
   }) async {
@@ -140,7 +132,6 @@ class InvoiceRepository {
       final subtotal = lines.fold<int>(0, (s, l) => s + l.total);
       final disc = _clamp(discount, 0, subtotal);
       final total = subtotal - disc;
-      final paidAmt = _clamp(paid, 0, total);
 
       final n = await _next(txn, 'purchase');
       final number = 'PUR-${n.toString().padLeft(6, '0')}';
@@ -153,8 +144,8 @@ class InvoiceRepository {
         'subtotal': subtotal,
         'discount': disc,
         'total': total,
-        'paid': paidAmt,
-        'payment_method': paidAmt >= total ? 'cash' : 'partial',
+        'paid': total,
+        'payment_method': 'cash',
         'cogs': 0,
         'status': 'completed',
         'created_at': _now,
