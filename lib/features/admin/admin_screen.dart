@@ -88,10 +88,11 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
           TextButton(
             onPressed: () {
               final days = int.tryParse(d.text.trim());
-              final users = defaultUsers == null
-                  ? 0
-                  : int.tryParse(u.text.trim());
-              if (days == null || days < 1 || users == null ||
+              final users =
+                  defaultUsers == null ? 0 : int.tryParse(u.text.trim());
+              if (days == null ||
+                  days < 1 ||
+                  users == null ||
                   (defaultUsers != null && users < 1)) {
                 return;
               }
@@ -187,7 +188,8 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                 child: TextField(
                     controller: _days,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'عدد الأيام'))),
+                    decoration:
+                        const InputDecoration(labelText: 'عدد الأيام'))),
             const SizedBox(width: 8),
             Expanded(
                 child: TextField(
@@ -234,17 +236,18 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
     final end = start?.add(Duration(days: days));
     final now = DateTime.now();
     final cancelled = days == 0;
-    final active = !cancelled && end != null && now.isBefore(end);
-    final left = (active && end != null)
-        ? (end.difference(now).inHours / 24).ceil()
-        : 0;
-    final String status = cancelled
-        ? 'ملغى'
-        : (active ? 'نشط • متبقي $left يوم' : 'منتهي');
+
+    final rawLeft = end == null ? 0 : (end.difference(now).inHours / 24).ceil();
+    final left = rawLeft < 0 ? 0 : rawLeft;
+    final active = !cancelled && left > 0;
+
+    final String status =
+        cancelled ? 'ملغى' : (active ? 'نشط • متبقي $left يوم' : 'منتهي');
     final color = active
         ? (left <= 5 ? AppColors.gold : AppColors.emerald)
         : AppColors.danger;
     final name = m['name'] as String;
+    final endText = (cancelled || end == null) ? '—' : fmtDate(end);
 
     return Card(
       margin: const EdgeInsets.only(top: 10),
@@ -266,8 +269,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
               ),
             ]),
             Text('المالك: ${m['ownerName']}'),
-            Text(
-                'ينتهي: ${(cancelled || end == null) ? '—' : fmtDate(end)}   •   مستخدمون: ${m['maxUsers']}'),
+            Text('ينتهي: $endText   •   مستخدمون: ${m['maxUsers']}'),
             const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 4, children: [
               FilledButton(
