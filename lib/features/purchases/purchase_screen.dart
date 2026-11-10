@@ -49,16 +49,13 @@ class PurchaseScreen extends ConsumerStatefulWidget {
 class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
   final _supplier = TextEditingController();
   final _discount = TextEditingController();
-  final _paid = TextEditingController();
   final List<_PLine> _lines = [];
-  bool _paidAll = true;
   bool _saving = false;
 
   @override
   void dispose() {
     _supplier.dispose();
     _discount.dispose();
-    _paid.dispose();
     for (final l in _lines) {
       l.dispose();
     }
@@ -73,6 +70,41 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
   int _int(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;
 
   int get _subtotal => _lines.fold(0, (a, l) => a + l.q * l.p);
+
+  Future<bool> _confirm(int total) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('تأكيد الشراء'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('الدفع نقداً للمورد'),
+            const SizedBox(height: 8),
+            Text(iqd(total),
+                style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.emerald)),
+            const SizedBox(height: 8),
+            const Text('سيتم إصدار الفاتورة وإضافة الكميات للمخزن.',
+                textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء')),
+          FilledButton(
+              style: FilledButton.styleFrom(
+                  minimumSize: const Size(110, 44)),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('تأكيد وإصدار')),
+        ],
+      ),
+    );
+    return ok == true;
+  }
 
   Future<void> _save() async {
     final s = ref.read(bootProvider).valueOrNull?.session;
@@ -99,13 +131,13 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
     final sub = _subtotal;
     final disc = _int(_discount).clamp(0, sub);
     final total = sub - disc;
-    final paid = _paidAll ? total : _int(_paid);
+    if (!await _confirm(total)) return;
+
     setState(() => _saving = true);
     try {
       final inv = await ref.read(invoiceRepoProvider).createPurchase(
             lines: _lines.map((l) => l.toLine()).toList(),
             discount: disc,
-            paid: paid,
             supplier: _supplier.text,
             userName: s!.userName,
           );
@@ -115,8 +147,9 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
       await showDialog<void>(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('تم حفظ فاتورة الشراء'),
-          content: Text('رقم الفاتورة: ${inv.number}\nالإجمالي: ${iqd(inv.total)}'),
+          title: const Text('تم إصدار فاتورة الشراء'),
+          content:
+              Text('رقم الفاتورة: ${inv.number}\nالإجمالي: ${iqd(inv.total)}'),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -138,7 +171,6 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
     final sub = _subtotal;
     final disc = _int(_discount).clamp(0, sub);
     final total = sub - disc;
-    final paid = _paidAll ? total : _int(_paid).clamp(0, total);
 
     return Scaffold(
       appBar: AppBar(title: const Text('فاتورة شراء جديدة')),
@@ -168,39 +200,20 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(labelText: 'الخصم (د.ع)'),
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('مدفوعة بالكامل'),
-              value: _paidAll,
-              onChanged: (v) => setState(() => _paidAll = v),
-            ),
-            if (!_paidAll)
-              TextField(
-                controller: _paid,
-                keyboardType: TextInputType.number,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(labelText: 'المبلغ المدفوع'),
-              ),
             const SizedBox(height: 12),
             Row(children: [
-              const Expanded(child: Text('الإجمالي')),
+              const Expanded(child: Text('الإجمالي (نقداً)')),
               Text(iqd(total),
                   style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
                       color: AppColors.emerald)),
             ]),
-            Row(children: [
-              const Expanded(child: Text('المتبقي للمورد')),
-              Text(iqd(total - paid),
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: total - paid > 0 ? AppColors.danger : null)),
-            ]),
             const SizedBox(height: 14),
-            FilledButton(
+            FilledButton.icon(
+              icon: const Icon(Icons.payments_outlined),
               onPressed: _saving ? null : _save,
-              child: Text(_saving ? 'جارٍ الحفظ...' : 'حفظ الفاتورة'),
+              label: Text(_saving ? 'جارٍ الحفظ...' : 'تأكيد الشراء نقداً'),
             ),
           ],
         ],
