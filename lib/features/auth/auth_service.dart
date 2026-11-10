@@ -29,13 +29,13 @@ String authMessage(Object e) {
       case 'invalid-credential':
       case 'wrong-password':
       case 'user-not-found':
-        return 'رقم الهاتف أو كلمة المرور غير صحيحة';
+        return 'بيانات الدخول غير صحيحة';
       case 'email-already-in-use':
         return 'رقم الهاتف هذا مسجل مسبقاً';
       case 'weak-password':
         return 'كلمة المرور ضعيفة (6 أحرف على الأقل)';
       case 'invalid-email':
-        return 'رقم الهاتف غير صالح';
+        return 'بيانات الدخول غير صالحة';
       case 'network-request-failed':
         return 'تحقق من اتصال الإنترنت';
       case 'too-many-requests':
@@ -53,7 +53,19 @@ class AuthService {
   final _auth = FirebaseAuth.instance;
   final _fs = FirebaseFirestore.instance;
 
-  static String emailFor(String phone) {
+  /// للدخول: رقم هاتف (أرقام) أو اسم مستخدم (حروف) مثل admin
+  static String emailFor(String input) {
+    final t = input.trim();
+    if (RegExp(r'[A-Za-z]').hasMatch(t)) {
+      final name = t.toLowerCase().replaceAll(RegExp(r'[^a-z0-9._-]'), '');
+      return '$name@mahalli.app';
+    }
+    final digits = t.replaceAll(RegExp(r'[^0-9]'), '');
+    return '$digits@mahalli.app';
+  }
+
+  /// للتسجيل: رقم الهاتف فقط
+  static String phoneEmail(String phone) {
     final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
     return '$digits@mahalli.app';
   }
@@ -68,13 +80,14 @@ class AuthService {
   static String newCode() {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final r = Random.secure();
-    String g() => List.generate(4, (_) => alphabet[r.nextInt(alphabet.length)]).join();
+    String g() =>
+        List.generate(4, (_) => alphabet[r.nextInt(alphabet.length)]).join();
     return '${g()}-${g()}-${g()}';
   }
 
-  Future<void> login(String phone, String password) async {
+  Future<void> login(String id, String password) async {
     await _auth.signInWithEmailAndPassword(
-        email: emailFor(phone), password: password);
+        email: emailFor(id), password: password);
   }
 
   Future<void> logout() => _auth.signOut();
@@ -89,7 +102,7 @@ class AuthService {
     String storeName = '',
   }) async {
     final cred = await _auth.createUserWithEmailAndPassword(
-        email: emailFor(phone), password: password);
+        email: phoneEmail(phone), password: password);
     final user = cred.user!;
     try {
       final id = codeId(code);
@@ -241,14 +254,21 @@ class AuthService {
   Stream<QuerySnapshot<Map<String, dynamic>>> allStores() =>
       _fs.collection('stores').snapshots();
 
+  /// تمديد اشتراك فعال بأيام إضافية
   Future<void> extendDays(String storeId, int days) => _fs
       .collection('stores')
       .doc(storeId)
       .update({'planDays': FieldValue.increment(days)});
 
-  Future<void> renewFromNow(String storeId, int days) =>
+  /// تفعيل / تجديد من الآن (وقت الخادم)
+  Future<void> activateFromNow(String storeId, int days, int maxUsers) =>
       _fs.collection('stores').doc(storeId).update({
         'subscriptionStart': FieldValue.serverTimestamp(),
         'planDays': days,
+        'maxUsers': maxUsers,
       });
+
+  /// إلغاء الاشتراك فوراً: يصبح المحل للعرض والتصدير فقط، ولا تُحذف بياناته
+  Future<void> cancelSubscription(String storeId) =>
+      _fs.collection('stores').doc(storeId).update({'planDays': 0});
 }
