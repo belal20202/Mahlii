@@ -24,8 +24,12 @@ jobs:
       - name: Generate Android platform files (if missing)
         run: |
           if [ ! -d android ]; then
-            flutter create . --platforms=android --project-name mahalli --org iq.mahalli
+            flutter create . --platforms=android --project-name mahalli --org com.Mahlli
           fi
+          # اسم الحزمة النهائي
+          for F in android/app/build.gradle android/app/build.gradle.kts; do
+            [ -f "$F" ] && sed -i 's/applicationId *=\? *"[^"]*"/applicationId = "com.Mahlli.Belal"/' "$F"
+          done
           MANIFEST=android/app/src/main/AndroidManifest.xml
           for P in CAMERA INTERNET ACCESS_NETWORK_STATE; do
             grep -q "android.permission.$P" $MANIFEST || \
