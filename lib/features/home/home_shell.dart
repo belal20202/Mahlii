@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/sound_service.dart';
 import '../../core/theme.dart';
 import '../../core/units.dart';
-import '../barcode/scan_screen.dart';
+import '../invoices/invoices_screen.dart';
+import '../permissions.dart';
 import '../products/products_screen.dart';
 import '../providers.dart';
+import '../sales/pos_screen.dart';
 import '../settings/more_screen.dart';
+import '../auth/auth_providers.dart';
 
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key});
@@ -18,7 +21,7 @@ class HomeShell extends ConsumerWidget {
     const pages = [
       DashboardPage(),
       ProductsScreen(),
-      ScanScreen(),
+      PosScreen(),
       MoreScreen(),
     ];
     return Scaffold(
@@ -36,7 +39,9 @@ class HomeShell extends ConsumerWidget {
               selectedIcon: Icon(Icons.inventory_2),
               label: 'المنتجات'),
           NavigationDestination(
-              icon: Icon(Icons.qr_code_scanner), label: 'مسح'),
+              icon: Icon(Icons.point_of_sale_outlined),
+              selectedIcon: Icon(Icons.point_of_sale),
+              label: 'بيع'),
           NavigationDestination(
               icon: Icon(Icons.more_horiz), label: 'المزيد'),
         ],
@@ -56,6 +61,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final stats = ref.watch(statsProvider);
+    final today = ref.watch(todayProvider);
+    final session = ref.watch(bootProvider).valueOrNull?.session;
+
+    void openInvoices() => Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const InvoicesScreen()));
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -78,6 +89,34 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           ],
         ),
         const SizedBox(height: 12),
+        today.when(
+          loading: () => const SizedBox.shrink(),
+          error: (e, _) => const SizedBox.shrink(),
+          data: (t) => Column(
+            children: [
+              _StatCard(
+                icon: Icons.payments_rounded,
+                title: 'مبيعات اليوم',
+                value: iqd(t.salesTotal),
+                onTap: openInvoices,
+              ),
+              _StatCard(
+                icon: Icons.receipt_long_rounded,
+                title: 'عدد فواتير اليوم',
+                value: '${t.invoiceCount}',
+                onTap: openInvoices,
+              ),
+              if (canSeeProfit(session))
+                _StatCard(
+                  icon: Icons.trending_up_rounded,
+                  title: 'الأرباح التقديرية اليوم',
+                  value: iqd(t.profit),
+                  color: AppColors.gold,
+                  onTap: openInvoices,
+                ),
+            ],
+          ),
+        ),
         stats.when(
           loading: () => const Padding(
               padding: EdgeInsets.all(40),
@@ -115,11 +154,6 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'المبيعات والأرباح والفواتير تظهر هنا بعد إضافة مرحلة نقطة البيع.',
-          style: TextStyle(color: Colors.grey),
         ),
       ],
     );
