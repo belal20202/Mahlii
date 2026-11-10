@@ -62,7 +62,9 @@ class ProductsScreen extends ConsumerWidget {
                     final p = list[i];
                     final low = p.isLow;
                     return Card(
-                      color: low ? AppColors.danger.withOpacity(0.08) : null,
+                      color: low
+                          ? AppColors.danger.withValues(alpha: 0.08)
+                          : null,
                       margin: const EdgeInsets.only(bottom: 10),
                       child: ListTile(
                         onTap: () => Navigator.of(context).push(
