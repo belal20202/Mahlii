@@ -14,21 +14,21 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _phone = TextEditingController();
+  final _id = TextEditingController();
   final _pass = TextEditingController();
   bool _busy = false;
   String? _error;
 
   @override
   void dispose() {
-    _phone.dispose();
+    _id.dispose();
     _pass.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    if (_phone.text.trim().isEmpty || _pass.text.isEmpty) {
-      setState(() => _error = 'أدخل رقم الهاتف وكلمة المرور');
+    if (_id.text.trim().isEmpty || _pass.text.isEmpty) {
+      setState(() => _error = 'أدخل بيانات الدخول وكلمة المرور');
       return;
     }
     setState(() {
@@ -36,7 +36,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
-      await ref.read(authServiceProvider).login(_phone.text.trim(), _pass.text);
+      await ref.read(authServiceProvider).login(_id.text.trim(), _pass.text);
       ref.invalidate(bootProvider);
     } catch (e) {
       if (mounted) setState(() => _error = authMessage(e));
@@ -64,12 +64,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 28),
                   TextField(
-                    controller: _phone,
-                    keyboardType: TextInputType.phone,
+                    controller: _id,
+                    keyboardType: TextInputType.emailAddress,
                     textDirection: TextDirection.ltr,
+                    autocorrect: false,
                     decoration: const InputDecoration(
-                        labelText: 'رقم الهاتف',
-                        prefixIcon: Icon(Icons.phone_outlined)),
+                        labelText: 'رقم الهاتف أو اسم المستخدم',
+                        prefixIcon: Icon(Icons.person_outline)),
                   ),
                   const SizedBox(height: 12),
                   TextField(
