@@ -1,0 +1,164 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    function adminDoc() {
+      return /databases/$(database)/documents/admins/$(request.auth.uid);
+    }
+    function storePath(sid) {
+      return /databases/$(database)/documents/stores/$(sid);
+    }
+    function memberPath(sid, uid) {
+      return /databases/$(database)/documents/stores/$(sid)/members/$(uid);
+    }
+    function invitePath(id) {
+      return /databases/$(database)/documents/invites/$(id);
+    }
+
+    function isAdmin() { return signedIn() && exists(adminDoc()); }
+
+    function isMember(sid) {
+      return signedIn()
+        && exists(memberPath(sid, request.auth.uid))
+        && get(memberPath(sid, request.auth.uid)).data.active == true;
+    }
+    function myRole(sid) { return get(memberPath(sid, request.auth.uid)).data.role; }
+
+    // الاشتراك: البداية (وقت الخادم) + عدد الأيام > الآن (وقت الخادم)
+    function subActive(sid) {
+      let s = get(storePath(sid)).data;
+      return s.subscriptionStart + duration.value(s.planDays, 'd') > request.time;
+    }
+
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false; // تُضاف من لوحة Firebase فقط
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['storeId', 'role'])
+        && getAfter(memberPath(request.resource.data.storeId, uid)).data.role
+             == request.resource.data.role;
+      // تحديث lastSeen فقط، لمعرفة وقت الخادم
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['storeId', 'role', 'lastSeen'])
+        && request.resource.data.storeId == resource.data.storeId
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.lastSeen == request.time;
+    }
+
+    match /invites/{inviteId} {
+      allow get: if signedIn();   // المعرّف هو SHA-256 للرمز ولا يمكن تخمينه
+      allow list: if false;
+
+      allow create: if (
+        // دعوة مالك: من الإدارة العامة فقط
+        isAdmin()
+        && request.resource.data.role == 'owner'
+        && request.resource.data.used == false
+        && request.resource.data.keys().hasOnly(
+             ['role', 'plan', 'planDays', 'maxUsers', 'used', 'createdBy', 'createdAt'])
+      ) || (
+        // دعوة موظف: من مالك أو مدير محل اشتراكه فعال
+        signedIn()
+        && request.resource.data.role in ['manager', 'cashier', 'warehouse']
+        && request.resource.data.storeId is string
+        && request.resource.data.used == false
+        && request.resource.data.keys().hasOnly(
+             ['role', 'storeId', 'used', 'createdBy', 'createdAt'])
+        && isMember(request.resource.data.storeId)
+        && subActive(request.resource.data.storeId)
+        && (myRole(request.resource.data.storeId) == 'owner'
+            || (myRole(request.resource.data.storeId) == 'manager'
+                && request.resource.data.role in ['cashier', 'warehouse']))
+      );
+
+      allow update: if signedIn()
+        && resource.data.used == false
+        && request.resource.data.used == true
+        && request.resource.data.usedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['used', 'usedBy', 'usedAt']);
+    }
+
+    match /stores/{sid} {
+      allow read: if isMember(sid) || isAdmin();
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(
+             ['name', 'ownerName', 'ownerUid', 'inviteId', 'plan',
+              'planDays', 'maxUsers', 'subscriptionStart'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.subscriptionStart == request.time
+        && get(invitePath(request.resource.data.inviteId)).data.role == 'owner'
+        && get(invitePath(request.resource.data.inviteId)).data.used == false
+        && request.resource.data.planDays
+             == get(invitePath(request.resource.data.inviteId)).data.planDays
+        && request.resource.data.maxUsers
+             == get(invitePath(request.resource.data.inviteId)).data.maxUsers
+        && request.resource.data.plan
+             == get(invitePath(request.resource.data.inviteId)).data.plan
+        && getAfter(invitePath(request.resource.data.inviteId)).data.used == true
+        && getAfter(invitePath(request.resource.data.inviteId)).data.usedBy
+             == request.auth.uid;
+
+      // الإدارة العامة تعدل الاشتراك. المالك لا يستطيع تعديل حقول الاشتراك.
+      allow update: if isAdmin()
+        || (isMember(sid) && myRole(sid) == 'owner'
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['subscriptionStart', 'planDays', 'maxUsers',
+                          'plan', 'ownerUid', 'inviteId']));
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow read: if signedIn() && (request.auth.uid == uid || isMember(sid));
+
+        allow create: if signedIn() && request.auth.uid == uid
+          && request.resource.data.active == true
+          && request.resource.data.keys().hasOnly(
+               ['userName', 'phone', 'role', 'active', 'permissions',
+                'inviteId', 'createdAt'])
+          && (
+            (request.resource.data.role == 'owner'
+              && getAfter(storePath(sid)).data.ownerUid == uid)
+            ||
+            (request.resource.data.role in ['manager', 'cashier', 'warehouse']
+              && get(invitePath(request.resource.data.inviteId)).data.storeId == sid
+              && get(invitePath(request.resource.data.inviteId)).data.role
+                   == request.resource.data.role
+              && get(invitePath(request.resource.data.inviteId)).data.used == false
+              && getAfter(invitePath(request.resource.data.inviteId)).data.used == true
+              && getAfter(invitePath(request.resource.data.inviteId)).data.usedBy == uid)
+          );
+
+        allow update: if isMember(sid) && myRole(sid) == 'owner'
+          && uid != request.auth.uid
+          && request.resource.data.role != 'owner'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['active', 'role', 'permissions']);
+        allow delete: if false;
+      }
+
+      // سجل التدقيق: إضافة فقط
+      match /audit_log/{id} {
+        allow read: if isMember(sid) && myRole(sid) in ['owner', 'manager'];
+        allow create: if isMember(sid) && subActive(sid);
+        allow update, delete: if false;
+      }
+
+      // بيانات المحل (ستُستخدم في مرحلة المزامنة)
+      match /{col}/{doc=**} {
+        allow read: if isMember(sid)
+          && col in ['products', 'stock_movements', 'invoices', 'purchases',
+                     'customers', 'expenses', 'sync_ops'];
+        allow write: if isMember(sid) && subActive(sid)
+          && col in ['products', 'stock_movements', 'invoices', 'purchases',
+                     'customers', 'expenses', 'sync_ops'];
+      }
+    }
+  }
+}
