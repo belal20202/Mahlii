@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/sound_service.dart';
 import '../../core/units.dart';
 import '../../models/product.dart';
+import '../auth/auth_providers.dart';
 import '../products/product_form.dart';
 import '../providers.dart';
 
@@ -32,7 +33,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
-    final code = capture.barcodes.isEmpty ? null : capture.barcodes.first.rawValue;
+    final code =
+        capture.barcodes.isEmpty ? null : capture.barcodes.first.rawValue;
     if (code == null) return;
     final now = DateTime.now();
     if (code == _lastCode && now.difference(_lastAt).inMilliseconds < 1500) {
@@ -70,6 +72,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   }
 
   Future<void> _sellOne() async {
+    if (!canWriteNow(ref)) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text(kExpiredMsg)));
+      return;
+    }
     final p = _found!;
     try {
       await ref.read(repoProvider).sellPieces(p.id!, 1);
@@ -91,13 +98,15 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   Widget build(BuildContext context) {
     final p = _found;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.pickMode ? 'امسح الباركود' : 'مسح الباركود')),
+      appBar: AppBar(
+          title: Text(widget.pickMode ? 'امسح الباركود' : 'مسح الباركود')),
       body: Column(
         children: [
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: MobileScanner(controller: _controller, onDetect: _onDetect),
+              child:
+                  MobileScanner(controller: _controller, onDetect: _onDetect),
             ),
           ),
           if (p != null)
@@ -114,7 +123,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                             fontSize: 18, fontWeight: FontWeight.w800)),
                     const SizedBox(height: 6),
                     Text('سعر البيع: ${iqd(p.salePrice)}'),
-                    Text('المتوفر: ${Units.format(p.qtyPieces, p.piecesPerCarton)}'),
+                    Text(
+                        'المتوفر: ${Units.format(p.qtyPieces, p.piecesPerCarton)}'),
                     const SizedBox(height: 12),
                     FilledButton.icon(
                       onPressed: _sellOne,
