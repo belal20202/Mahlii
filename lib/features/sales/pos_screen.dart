@@ -24,9 +24,6 @@ class PosScreen extends ConsumerStatefulWidget {
 
 class _PosScreenState extends ConsumerState<PosScreen> {
   final _discount = TextEditingController();
-  final _paid = TextEditingController();
-  final _customer = TextEditingController();
-  String _method = 'cash';
   bool _saving = false;
   MobileScannerController? _sc;
   String? _lastCode;
@@ -35,8 +32,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   @override
   void dispose() {
     _discount.dispose();
-    _paid.dispose();
-    _customer.dispose();
     _sc?.dispose();
     super.dispose();
   }
@@ -89,6 +84,41 @@ class _PosScreenState extends ConsumerState<PosScreen> {
 
   int _int(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;
 
+  Future<bool> _confirm(int total) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('تأكيد البيع'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('الدفع نقداً'),
+            const SizedBox(height: 8),
+            Text(iqd(total),
+                style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.emerald)),
+            const SizedBox(height: 8),
+            const Text('هل استلمت المبلغ؟ سيتم إصدار الفاتورة عند التأكيد.',
+                textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء')),
+          FilledButton(
+              style: FilledButton.styleFrom(
+                  minimumSize: const Size(110, 44)),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('تأكيد وإصدار')),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   Future<void> _save() async {
     final s = ref.read(bootProvider).valueOrNull?.session;
     if (!canSell(s)) {
@@ -107,33 +137,23 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final sub = lines.fold<int>(0, (a, l) => a + l.total);
     final disc = _int(_discount).clamp(0, sub);
     final total = sub - disc;
-    final paid = _int(_paid);
-    if (_method != 'cash' && _customer.text.trim().isEmpty) {
-      _msg('أدخل اسم العميل للبيع الآجل أو الجزئي');
-      return;
-    }
-    if (_method == 'partial' && (paid <= 0 || paid >= total)) {
-      _msg('في الدفع الجزئي يجب أن يكون المدفوع أكبر من صفر وأقل من الإجمالي');
-      return;
-    }
+    if (!await _confirm(total)) return;
+
     setState(() => _saving = true);
     try {
-      final inv = await ref.read(invoiceRepoProvider).createSale(
+      final Invoice inv = await ref.read(invoiceRepoProvider).createSale(
             lines: lines,
             discount: disc,
-            method: _method,
-            paid: paid,
-            customer: _customer.text,
             userName: s!.userName,
           );
       ref.read(cartProvider.notifier).clear();
       refreshData(ref);
       _discount.clear();
-      _paid.clear();
-      _customer.clear();
-      setState(() => _method = 'cash');
       await SoundService.play(Sfx.sold);
-      if (mounted) _showDone(inv);
+      if (mounted) {
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => InvoiceDetailScreen(invoice: inv)));
+      }
     } on InsufficientStockException catch (e) {
       await SoundService.play(Sfx.error);
       _msg('الكمية غير كافية للمنتج: ${e.productName}');
@@ -143,29 +163,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  void _showDone(Invoice inv) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('تم حفظ الفاتورة'),
-        content: Text('${inv.number}\nالإجمالي: ${iqd(inv.total)}'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => InvoiceDetailScreen(invoice: inv)));
-            },
-            child: const Text('عرض'),
-          ),
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('تم')),
-        ],
-      ),
-    );
   }
 
   @override
@@ -244,35 +241,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(labelText: 'الخصم (د.ع)'),
             ),
-            const SizedBox(height: 10),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'cash', label: Text('نقدي')),
-                ButtonSegment(value: 'credit', label: Text('آجل')),
-                ButtonSegment(value: 'partial', label: Text('جزئي')),
-              ],
-              selected: {_method},
-              onSelectionChanged: (v) => setState(() => _method = v.first),
-            ),
-            if (_method == 'partial') ...[
-              const SizedBox(height: 10),
-              TextField(
-                controller: _paid,
-                keyboardType: TextInputType.number,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(labelText: 'المبلغ المدفوع'),
-              ),
-            ],
-            if (_method != 'cash') ...[
-              const SizedBox(height: 10),
-              TextField(
-                controller: _customer,
-                decoration: const InputDecoration(labelText: 'اسم العميل'),
-              ),
-            ],
             const SizedBox(height: 14),
             Row(children: [
-              const Expanded(child: Text('الإجمالي')),
+              const Expanded(child: Text('الإجمالي (نقداً)')),
               Text(iqd(total),
                   style: const TextStyle(
                       fontSize: 22,
@@ -280,9 +251,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
                       color: AppColors.emerald)),
             ]),
             const SizedBox(height: 12),
-            FilledButton(
+            FilledButton.icon(
+              icon: const Icon(Icons.payments_outlined),
               onPressed: _saving ? null : _save,
-              child: Text(_saving ? 'جارٍ الحفظ...' : 'حفظ الفاتورة'),
+              label: Text(_saving ? 'جارٍ الحفظ...' : 'تأكيد البيع نقداً'),
             ),
           ],
         ],
