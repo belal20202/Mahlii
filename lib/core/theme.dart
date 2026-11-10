@@ -44,14 +44,15 @@ class AppTheme {
         centerTitle: true,
         foregroundColor: scheme.onSurface,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         color: scheme.brightness == Brightness.light
             ? Colors.white
             : const Color(0xFF1B2723),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: BorderSide(color: scheme.outlineVariant.withOpacity(0.4)),
+          side: BorderSide(
+              color: scheme.outlineVariant.withValues(alpha: 0.4)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
