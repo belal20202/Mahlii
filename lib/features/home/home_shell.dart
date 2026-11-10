@@ -4,13 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/sound_service.dart';
 import '../../core/theme.dart';
 import '../../core/units.dart';
+import '../auth/auth_providers.dart';
 import '../invoices/invoices_screen.dart';
 import '../permissions.dart';
 import '../products/products_screen.dart';
 import '../providers.dart';
 import '../sales/pos_screen.dart';
 import '../settings/more_screen.dart';
-import '../auth/auth_providers.dart';
 
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key});
@@ -187,7 +187,7 @@ class _StatCard extends StatelessWidget {
           child: Row(
             children: [
               CircleAvatar(
-                backgroundColor: color.withOpacity(0.12),
+                backgroundColor: color.withValues(alpha: 0.12),
                 child: Icon(icon, color: color),
               ),
               const SizedBox(width: 14),
