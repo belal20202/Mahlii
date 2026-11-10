@@ -79,12 +79,12 @@ class AboutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('حول محلي')),
+    return const Scaffold(
+      appBar: _AboutBar(),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             Icon(Icons.storefront_rounded, size: 72, color: AppColors.emerald),
             SizedBox(height: 12),
             Text('محلي – Mahalli',
@@ -108,4 +108,15 @@ class AboutScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AboutBar extends StatelessWidget implements PreferredSizeWidget {
+  const _AboutBar();
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) =>
+      AppBar(title: const Text('حول محلي'));
 }
