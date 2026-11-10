@@ -43,7 +43,7 @@ class SubscriptionScreen extends ConsumerWidget {
                 children: [
                   Chip(
                     label: Text(active ? 'اشتراك فعال' : 'منتهي'),
-                    backgroundColor: color.withOpacity(0.12),
+                    backgroundColor: color.withValues(alpha: 0.12),
                     labelStyle: TextStyle(color: color),
                   ),
                   const SizedBox(height: 8),
