@@ -5,6 +5,7 @@ import '../../core/sound_service.dart';
 import '../../core/units.dart';
 import '../../models/product.dart';
 import '../../repositories/product_repository.dart';
+import '../auth/auth_providers.dart';
 import '../barcode/scan_screen.dart';
 import '../providers.dart';
 
@@ -38,15 +39,27 @@ class _ProductFormState extends ConsumerState<ProductForm> {
     cost = TextEditingController(text: p == null ? '' : '${p.costPrice}');
     sale = TextEditingController(text: p == null ? '' : '${p.salePrice}');
     perCarton = TextEditingController(text: '$per');
-    cartons = TextEditingController(text: p == null ? '0' : '${p.qtyPieces ~/ per}');
-    pieces = TextEditingController(text: p == null ? '0' : '${p.qtyPieces % per}');
+    cartons =
+        TextEditingController(text: p == null ? '0' : '${p.qtyPieces ~/ per}');
+    pieces =
+        TextEditingController(text: p == null ? '0' : '${p.qtyPieces % per}');
     minStock = TextEditingController(text: '${p?.minStock ?? 10}');
   }
 
   @override
   void dispose() {
-    for (final c in [name, barcode, category, maker, cost, sale, perCarton,
-        cartons, pieces, minStock]) {
+    for (final c in [
+      name,
+      barcode,
+      category,
+      maker,
+      cost,
+      sale,
+      perCarton,
+      cartons,
+      pieces,
+      minStock
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -63,6 +76,10 @@ class _ProductFormState extends ConsumerState<ProductForm> {
           : null;
 
   Future<void> _save() async {
+    if (!canWriteNow(ref)) {
+      _snack(kExpiredMsg);
+      return;
+    }
     if (!_key.currentState!.validate()) return;
     final per = _n(perCarton) < 1 ? 1 : _n(perCarton);
     final p = Product(
@@ -99,11 +116,16 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   }
 
   Future<void> _delete() async {
+    if (!canWriteNow(ref)) {
+      _snack(kExpiredMsg);
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('حذف المنتج'),
-        content: const Text('سيتم إخفاء المنتج مع الاحتفاظ بسجله. هل تريد المتابعة؟'),
+        content:
+            const Text('سيتم إخفاء المنتج مع الاحتفاظ بسجله. هل تريد المتابعة؟'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -155,7 +177,8 @@ class _ProductFormState extends ConsumerState<ProductForm> {
         title: Text(_edit ? 'تعديل منتج' : 'منتج جديد'),
         actions: [
           if (_edit)
-            IconButton(onPressed: _delete, icon: const Icon(Icons.delete_outline)),
+            IconButton(
+                onPressed: _delete, icon: const Icon(Icons.delete_outline)),
         ],
       ),
       body: Form(
@@ -200,11 +223,16 @@ class _ProductFormState extends ConsumerState<ProductForm> {
             _field('عدد القطع في الكارتون', perCarton,
                 number: true, validator: _num),
             Row(children: [
-              Expanded(child: _field('الكمية (كراتين)', cartons, number: true, validator: _num)),
+              Expanded(
+                  child: _field('الكمية (كراتين)', cartons,
+                      number: true, validator: _num)),
               const SizedBox(width: 10),
-              Expanded(child: _field('الكمية (قطع)', pieces, number: true, validator: _num)),
+              Expanded(
+                  child: _field('الكمية (قطع)', pieces,
+                      number: true, validator: _num)),
             ]),
-            _field('حد التنبيه (قطع)', minStock, number: true, validator: _num),
+            _field('حد التنبيه (قطع)', minStock,
+                number: true, validator: _num),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: _saving ? null : _save,
