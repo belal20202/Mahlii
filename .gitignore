@@ -1,0 +1,17 @@
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+.DS_Store
+
+# الأسرار — لا تُرفع أبداً
+*.jks
+*.keystore
+key.properties
+google-services.json
+GoogleService-Info.plist
+serviceAccount*.json
+.env
