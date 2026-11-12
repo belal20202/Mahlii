@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/sound_service.dart';
+import '../../widgets/barcode_camera.dart';
 
 /// يفتح الكاميرا ويعيد أول باركود مقروء.
 class ScanScreen extends StatefulWidget {
@@ -12,21 +12,10 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  final _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
-  );
   bool _done = false;
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _onDetect(BarcodeCapture c) async {
+  Future<void> _onCode(String code) async {
     if (_done) return;
-    final code = c.barcodes.isEmpty ? null : c.barcodes.first.rawValue;
-    if (code == null || code.isEmpty) return;
     _done = true;
     await SoundService.play(Sfx.scan);
     if (mounted) Navigator.of(context).pop(code);
@@ -36,9 +25,12 @@ class _ScanScreenState extends State<ScanScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('امسح الباركود')),
-      body: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: MobileScanner(controller: _controller, onDetect: _onDetect),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BarcodeCamera(onCode: _onCode),
+        ),
       ),
     );
   }
