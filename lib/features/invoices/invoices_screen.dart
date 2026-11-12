@@ -8,6 +8,7 @@ import '../../models/invoice.dart';
 import '../providers.dart';
 import 'invoice_detail_screen.dart';
 
+/// فواتير المبيعات فقط
 class InvoicesScreen extends ConsumerStatefulWidget {
   const InvoicesScreen({super.key});
 
@@ -16,7 +17,6 @@ class InvoicesScreen extends ConsumerStatefulWidget {
 }
 
 class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
-  String _type = 'sale';
   String _q = '';
   late Future<List<Invoice>> _f;
 
@@ -27,34 +27,20 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
   }
 
   void _load() {
-    _f = ref.read(invoiceRepoProvider).list(_type, query: _q);
+    _f = ref.read(invoiceRepoProvider).listSales(query: _q);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('الفواتير')),
+      appBar: AppBar(title: const Text('فواتير المبيعات')),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'sale', label: Text('مبيعات')),
-                ButtonSegment(value: 'purchase', label: Text('مشتريات')),
-              ],
-              selected: {_type},
-              onSelectionChanged: (v) => setState(() {
-                _type = v.first;
-                _load();
-              }),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               decoration: const InputDecoration(
-                  hintText: 'ابحث برقم الفاتورة أو الاسم',
+                  hintText: 'ابحث برقم الفاتورة',
                   prefixIcon: Icon(Icons.search)),
               onChanged: (v) => setState(() {
                 _q = v;
@@ -87,14 +73,14 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
                       child: ListTile(
                         onTap: () async {
                           await Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => InvoiceDetailScreen(invoice: inv)));
+                              builder: (_) =>
+                                  InvoiceDetailScreen(invoice: inv)));
                           setState(_load);
                         },
                         title: Text(inv.number,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700)),
-                        subtitle: Text(
-                            '${fmtDateTime(inv.createdAt)}${inv.party == null ? '' : '  •  ${inv.party}'}'),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: Text(fmtDateTime(inv.createdAt)),
                         trailing: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -108,8 +94,7 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
                             if (returned)
                               const Text('مرتجعة',
                                   style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.danger)),
+                                      fontSize: 12, color: AppColors.danger)),
                           ],
                         ),
                       ),
