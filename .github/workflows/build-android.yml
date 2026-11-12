@@ -49,7 +49,7 @@ jobs:
               sed -i "0,/<application/s//<uses-permission android:name=\"android.permission.$P\"\/>\n    <application/" $MANIFEST
           done
           sed -i 's/android:label="[^"]*"/android:label="محلي"/' $MANIFEST
-          # Firebase يتطلب minSdk 23 على الأقل
+          # minSdk 23 على الأقل (Firebase والكاميرا)
           sed -i 's/flutter\.minSdkVersion/23/' android/app/build.gradle* || true
 
       - run: flutter pub get
@@ -58,7 +58,7 @@ jobs:
 
       - name: Build release APK
         run: |
-          flutter build apk --release \
+          flutter build apk --release --no-shrink \
             --dart-define=FB_API_KEY=${{ secrets.FB_API_KEY }} \
             --dart-define=FB_APP_ID=${{ secrets.FB_APP_ID }} \
             --dart-define=FB_SENDER_ID=${{ secrets.FB_SENDER_ID }} \
