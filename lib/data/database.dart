@@ -10,13 +10,15 @@ class AppDb {
     final path = join(await getDatabasesPath(), 'mahalli.db');
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, v) async {
         await _createV1(db);
         await _createV2(db);
+        await _upgradeV3(db);
       },
       onUpgrade: (db, oldV, newV) async {
         if (oldV < 2) await _createV2(db);
+        if (oldV < 3) await _upgradeV3(db);
       },
     );
   }
@@ -39,7 +41,6 @@ class AppDb {
         updated_at INTEGER NOT NULL,
         deleted INTEGER NOT NULL DEFAULT 0
       )''');
-    // باركود فريد للمنتجات غير المحذوفة فقط، ويسمح بمنتجات بلا باركود
     await db.execute('''
       CREATE UNIQUE INDEX ux_products_barcode
       ON products(barcode) WHERE barcode IS NOT NULL AND deleted = 0''');
@@ -82,8 +83,8 @@ class AppDb {
         status TEXT NOT NULL DEFAULT 'completed',
         created_at INTEGER NOT NULL
       )''');
-    await db.execute(
-        'CREATE INDEX ix_invoices_created ON invoices(created_at)');
+    await db
+        .execute('CREATE INDEX ix_invoices_created ON invoices(created_at)');
     await db.execute('''
       CREATE TABLE invoice_items(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,12 +97,38 @@ class AppDb {
         unit_price INTEGER NOT NULL,
         unit_cost INTEGER NOT NULL
       )''');
-    await db.execute(
-        'CREATE INDEX ix_items_invoice ON invoice_items(invoice_id)');
+    await db
+        .execute('CREATE INDEX ix_items_invoice ON invoice_items(invoice_id)');
     await db.execute('''
       CREATE TABLE counters(
         key TEXT PRIMARY KEY,
         value INTEGER NOT NULL
       )''');
+  }
+
+  static Future<void> _upgradeV3(Database db) async {
+    await db.execute('ALTER TABLE products ADD COLUMN image_path TEXT');
+    await db.execute('ALTER TABLE stock_movements ADD COLUMN user_name TEXT');
+    await db.execute('''
+      CREATE TABLE receipts(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        number TEXT NOT NULL UNIQUE,
+        user_name TEXT,
+        items_count INTEGER NOT NULL,
+        total_pieces INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )''');
+    await db
+        .execute('CREATE INDEX ix_receipts_created ON receipts(created_at)');
+    await db.execute('''
+      CREATE TABLE receipt_items(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        receipt_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        qty INTEGER NOT NULL
+      )''');
+    await db.execute(
+        'CREATE INDEX ix_receipt_items ON receipt_items(receipt_id)');
   }
 }
