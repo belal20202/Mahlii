@@ -10,7 +10,7 @@ class InsufficientStockException implements Exception {
   InsufficientStockException(this.productName);
 }
 
-/// كل العمليات نقدية: المدفوع = الإجمالي دائماً.
+/// فواتير المبيعات فقط، وكلها نقدية.
 class InvoiceRepository {
   int get _now => DateTime.now().millisecondsSinceEpoch;
 
@@ -39,7 +39,6 @@ class InvoiceRepository {
         'created_at': _now,
       });
 
-  // ---------------- البيع (نقدي) ----------------
   Future<Invoice> createSale({
     required List<CartLine> lines,
     required int discount,
@@ -49,28 +48,22 @@ class InvoiceRepository {
     return db.transaction((txn) async {
       final need = <int, int>{};
       for (final l in lines) {
-        need[l.product.id!] = (need[l.product.id!] ?? 0) + l.pieces;
+        need[l.product.id!] = (need[l.product.id!] ?? 0) + l.qty;
       }
-      final cost = <int, int>{};
       for (final e in need.entries) {
         final r = await txn.query('products',
-            columns: ['qty_pieces', 'name', 'cost_price'],
+            columns: ['qty_pieces', 'name'],
             where: 'id = ? AND deleted = 0',
             whereArgs: [e.key]);
         if (r.isEmpty) throw StateError('product missing');
         if ((r.first['qty_pieces'] as int) < e.value) {
           throw InsufficientStockException(r.first['name'] as String);
         }
-        cost[e.key] = r.first['cost_price'] as int;
       }
 
       final subtotal = lines.fold<int>(0, (s, l) => s + l.total);
       final disc = _clamp(discount, 0, subtotal);
       final total = subtotal - disc;
-      var cogs = 0;
-      for (final l in lines) {
-        cogs += l.pieces * cost[l.product.id!]!;
-      }
 
       final n = await _next(txn, 'sale');
       final number = 'INV-${n.toString().padLeft(6, '0')}';
@@ -79,67 +72,6 @@ class InvoiceRepository {
         'number': number,
         'type': 'sale',
         'party': null,
-        'user_name': userName,
-        'subtotal': subtotal,
-        'discount': disc,
-        'total': total,
-        'paid': total,
-        'payment_method': 'cash',
-        'cogs': cogs,
-        'status': 'completed',
-        'created_at': _now,
-      };
-      final id = await txn.insert('invoices', m);
-
-      for (final l in lines) {
-        await txn.insert('invoice_items', {
-          'invoice_id': id,
-          'product_id': l.product.id,
-          'name': l.product.name,
-          'unit': l.carton ? 'carton' : 'piece',
-          'qty': l.qty,
-          'pieces_per_unit': l.perUnit,
-          'unit_price': l.unitPrice,
-          'unit_cost': cost[l.product.id!]!,
-        });
-      }
-      for (final e in need.entries) {
-        await txn.rawUpdate(
-            'UPDATE products SET qty_pieces = qty_pieces - ?, updated_at = ? WHERE id = ?',
-            [e.value, _now, e.key]);
-        await txn.insert('stock_movements', {
-          'product_id': e.key,
-          'type': 'sale',
-          'delta_pieces': -e.value,
-          'note': number,
-          'created_at': _now,
-        });
-      }
-      await _audit(txn, 'sale', id, '$number / $total');
-      return Invoice.fromMap({...m, 'id': id});
-    });
-  }
-
-  // ---------------- الشراء من مورد (نقدي) ----------------
-  Future<Invoice> createPurchase({
-    required List<CartLine> lines,
-    required int discount,
-    required String supplier,
-    required String userName,
-  }) async {
-    final db = await AppDb.get();
-    return db.transaction((txn) async {
-      final subtotal = lines.fold<int>(0, (s, l) => s + l.total);
-      final disc = _clamp(discount, 0, subtotal);
-      final total = subtotal - disc;
-
-      final n = await _next(txn, 'purchase');
-      final number = 'PUR-${n.toString().padLeft(6, '0')}';
-      final m = <String, Object?>{
-        'op_id': _opId(),
-        'number': number,
-        'type': 'purchase',
-        'party': supplier.trim(),
         'user_name': userName,
         'subtotal': subtotal,
         'discount': disc,
@@ -157,35 +89,31 @@ class InvoiceRepository {
           'invoice_id': id,
           'product_id': l.product.id,
           'name': l.product.name,
-          'unit': l.carton ? 'carton' : 'piece',
+          'unit': 'piece',
           'qty': l.qty,
-          'pieces_per_unit': l.perUnit,
+          'pieces_per_unit': 1,
           'unit_price': l.unitPrice,
-          'unit_cost': l.costPerPiece,
+          'unit_cost': 0,
         });
-        if (l.costPerPiece > 0) {
-          await txn.rawUpdate(
-              'UPDATE products SET qty_pieces = qty_pieces + ?, cost_price = ?, updated_at = ? WHERE id = ?',
-              [l.pieces, l.costPerPiece, _now, l.product.id]);
-        } else {
-          await txn.rawUpdate(
-              'UPDATE products SET qty_pieces = qty_pieces + ?, updated_at = ? WHERE id = ?',
-              [l.pieces, _now, l.product.id]);
-        }
+      }
+      for (final e in need.entries) {
+        await txn.rawUpdate(
+            'UPDATE products SET qty_pieces = qty_pieces - ?, updated_at = ? WHERE id = ?',
+            [e.value, _now, e.key]);
         await txn.insert('stock_movements', {
-          'product_id': l.product.id,
-          'type': 'purchase',
-          'delta_pieces': l.pieces,
+          'product_id': e.key,
+          'type': 'sale',
+          'delta_pieces': -e.value,
           'note': number,
+          'user_name': userName,
           'created_at': _now,
         });
       }
-      await _audit(txn, 'purchase', id, '$number / $total');
+      await _audit(txn, 'sale', id, '$number / $total');
       return Invoice.fromMap({...m, 'id': id});
     });
   }
 
-  // ---------------- إرجاع كامل ----------------
   Future<void> returnSale(int invoiceId, String userName) async {
     final db = await AppDb.get();
     await db.transaction((txn) async {
@@ -208,6 +136,7 @@ class InvoiceRepository {
           'type': 'return',
           'delta_pieces': pieces,
           'note': number,
+          'user_name': userName,
           'created_at': _now,
         });
       }
@@ -217,15 +146,13 @@ class InvoiceRepository {
     });
   }
 
-  // ---------------- الاستعلامات ----------------
-  Future<List<Invoice>> list(String type,
-      {String query = '', int limit = 200}) async {
+  Future<List<Invoice>> listSales({String query = '', int limit = 200}) async {
     final db = await AppDb.get();
-    final where = StringBuffer('type = ?');
-    final args = <Object?>[type];
+    final where = StringBuffer("type = 'sale'");
+    final args = <Object?>[];
     if (query.trim().isNotEmpty) {
-      where.write(' AND (number LIKE ? OR party LIKE ?)');
-      args.addAll(['%${query.trim()}%', '%${query.trim()}%']);
+      where.write(' AND number LIKE ?');
+      args.add('%${query.trim()}%');
     }
     final rows = await db.query('invoices',
         where: where.toString(),
@@ -247,14 +174,11 @@ class InvoiceRepository {
     final n = DateTime.now();
     final start = DateTime(n.year, n.month, n.day).millisecondsSinceEpoch;
     final r = await db.rawQuery('''
-      SELECT COUNT(*) AS c,
-             COALESCE(SUM(total), 0) AS t,
-             COALESCE(SUM(total - cogs), 0) AS p
+      SELECT COUNT(*) AS c, COALESCE(SUM(total), 0) AS t
       FROM invoices
       WHERE type = 'sale' AND status = 'completed' AND created_at >= ?''',
         [start]);
     final row = r.first;
-    return TodaySummary((row['t'] as num).toInt(), (row['c'] as num).toInt(),
-        (row['p'] as num).toInt());
+    return TodaySummary((row['t'] as num).toInt(), (row['c'] as num).toInt());
   }
 }
