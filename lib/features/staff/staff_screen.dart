@@ -16,6 +16,10 @@ class StaffScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: Text('غير مصرح')));
     }
     final svc = ref.read(authServiceProvider);
+
+    void msg(String m) => ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(m)));
+
     return Scaffold(
       appBar: AppBar(title: const Text('الموظفون')),
       body: StreamBuilder(
@@ -28,7 +32,8 @@ class StaffScreen extends ConsumerWidget {
             return const Center(child: CircularProgressIndicator());
           }
           final docs = snap.data!.docs;
-          final activeCount = docs.where((d) => d.data()['active'] == true).length;
+          final activeCount =
+              docs.where((d) => d.data()['active'] == true).length;
           return Column(
             children: [
               Padding(
@@ -48,11 +53,11 @@ class StaffScreen extends ConsumerWidget {
                                 value: d.data()['active'] == true,
                                 onChanged: (v) async {
                                   try {
-                                    await svc.setMemberActive(s.storeId, d.id, v);
+                                    await svc.setMemberActive(
+                                        s.storeId, d.id, v);
                                   } catch (e) {
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text(authMessage(e))));
+                                      msg(authMessage(e));
                                     }
                                   }
                                 },
@@ -69,40 +74,18 @@ class StaffScreen extends ConsumerWidget {
                   label: const Text('إنشاء رمز دعوة لموظف'),
                   onPressed: () async {
                     if (!s.canWrite) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(const SnackBar(content: Text(kExpiredMsg)));
+                      msg(kExpiredMsg);
                       return;
                     }
                     if (activeCount >= s.maxUsers) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('وصلت للحد الأقصى من المستخدمين في باقتك')));
+                      msg('وصلت للحد الأقصى من المستخدمين في باقتك');
                       return;
                     }
-                    final roles = s.isOwner
-                        ? ['manager', 'cashier', 'warehouse']
-                        : ['cashier', 'warehouse'];
-                    final role = await showDialog<String>(
-                      context: context,
-                      builder: (_) => SimpleDialog(
-                        title: const Text('دور الموظف'),
-                        children: [
-                          for (final r in roles)
-                            SimpleDialogOption(
-                              onPressed: () => Navigator.pop(context, r),
-                              child: Text(Session.roleLabels[r]!),
-                            ),
-                        ],
-                      ),
-                    );
-                    if (role == null) return;
                     try {
-                      final code = await svc.createStaffInvite(s, role);
+                      final code = await svc.createStaffInvite(s, 'cashier');
                       if (context.mounted) await showCodeDialog(context, code);
                     } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(authMessage(e))));
-                      }
+                      if (context.mounted) msg(authMessage(e));
                     }
                   },
                 ),
