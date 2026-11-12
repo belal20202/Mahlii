@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../core/units.dart';
+import '../../widgets/product_thumb.dart';
 import '../providers.dart';
 import 'product_form.dart';
 
@@ -28,7 +29,7 @@ class ProductsScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: TextField(
               decoration: const InputDecoration(
-                hintText: 'ابحث بالاسم أو الباركود',
+                hintText: 'ابحث بالاسم أو الباركود أو القسم',
                 prefixIcon: Icon(Icons.search),
               ),
               onChanged: (v) => ref.read(searchProvider.notifier).state = v,
@@ -71,14 +72,14 @@ class ProductsScreen extends ConsumerWidget {
                           MaterialPageRoute(
                               builder: (_) => ProductForm(product: p)),
                         ),
+                        leading: ProductThumb(path: p.imagePath),
                         title: Text(p.name,
                             style:
                                 const TextStyle(fontWeight: FontWeight.w700)),
                         subtitle: Text(
-                          '${Units.format(p.qtyPieces, p.piecesPerCarton)}'
-                          '  •  ${p.barcode ?? 'بدون باركود'}',
-                          style: TextStyle(
-                              color: low ? AppColors.danger : null),
+                          '${p.category ?? ''}  •  ${p.qtyPieces} قطعة',
+                          style:
+                              TextStyle(color: low ? AppColors.danger : null),
                         ),
                         trailing: Text(iqd(p.salePrice),
                             style: const TextStyle(
