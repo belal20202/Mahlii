@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../about/about_screen.dart';
 import '../auth/auth_providers.dart';
 import '../invoices/invoices_screen.dart';
 import '../permissions.dart';
@@ -80,51 +81,4 @@ class MoreScreen extends ConsumerWidget {
       ],
     );
   }
-}
-
-class AboutScreen extends StatelessWidget {
-  const AboutScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      appBar: _AboutBar(),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.storefront_rounded, size: 72, color: AppColors.emerald),
-            SizedBox(height: 12),
-            Text('محلي – Mahalli',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
-            SizedBox(height: 6),
-            Text('نظام إدارة المحلات والمخازن الذكي'),
-            SizedBox(height: 24),
-            Text('المطور: بلال النعيمي'),
-            Text('Developer: Belal Alnaimi'),
-            SizedBox(height: 16),
-            Text('صنع في العراق',
-                style: TextStyle(
-                    color: AppColors.gold,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16)),
-            Text('Made in Iraq', style: TextStyle(color: AppColors.gold)),
-            SizedBox(height: 16),
-            Text('الإصدار 1.0.0'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AboutBar extends StatelessWidget implements PreferredSizeWidget {
-  const _AboutBar();
-
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
-
-  @override
-  Widget build(BuildContext context) =>
-      AppBar(title: const Text('حول محلي'));
 }
