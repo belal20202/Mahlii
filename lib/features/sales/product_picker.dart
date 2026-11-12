@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/units.dart';
 import '../../models/product.dart';
+import '../../widgets/product_thumb.dart';
 import '../providers.dart';
 
 Future<Product?> pickProduct(BuildContext context) {
@@ -32,7 +33,8 @@ class _PickerSheetState extends ConsumerState<_PickerSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.7,
         child: Column(
@@ -64,9 +66,9 @@ class _PickerSheetState extends ConsumerState<_PickerSheet> {
                     itemBuilder: (_, i) {
                       final p = list[i];
                       return ListTile(
+                        leading: ProductThumb(path: p.imagePath, size: 44),
                         title: Text(p.name),
-                        subtitle: Text(
-                            'المتوفر: ${Units.format(p.qtyPieces, p.piecesPerCarton)}'),
+                        subtitle: Text('المتوفر: ${p.qtyPieces} قطعة'),
                         trailing: Text(iqd(p.salePrice)),
                         onTap: () => Navigator.pop(context, p),
                       );
