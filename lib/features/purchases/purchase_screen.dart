@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/sound_service.dart';
 import '../../core/theme.dart';
 import '../../models/product.dart';
 import '../../models/receipt.dart';
+import '../../widgets/barcode_camera.dart';
 import '../../widgets/product_thumb.dart';
 import '../auth/auth_providers.dart';
 import '../permissions.dart';
@@ -31,38 +31,14 @@ class PurchaseScreen extends ConsumerStatefulWidget {
 
 class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
   final List<_RLine> _lines = [];
-  MobileScannerController? _sc;
-  String? _lastCode;
-  DateTime _lastAt = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _scanning = false;
   bool _saving = false;
-
-  @override
-  void dispose() {
-    _sc?.dispose();
-    super.dispose();
-  }
 
   void _msg(String m) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(m)));
-  }
-
-  void _stopScan() {
-    if (_sc == null) return;
-    final old = _sc;
-    setState(() => _sc = null);
-    WidgetsBinding.instance.addPostFrameCallback((_) => old?.dispose());
-  }
-
-  void _toggleScan() {
-    if (_sc != null) {
-      _stopScan();
-    } else {
-      setState(() => _sc =
-          MobileScannerController(detectionSpeed: DetectionSpeed.normal));
-    }
   }
 
   int get _totalPieces => _lines.fold(0, (a, l) => a + l.qty);
@@ -79,15 +55,7 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
     SoundService.play(Sfx.added);
   }
 
-  Future<void> _onDetect(BarcodeCapture c) async {
-    final code = c.barcodes.isEmpty ? null : c.barcodes.first.rawValue;
-    if (code == null) return;
-    final now = DateTime.now();
-    if (code == _lastCode && now.difference(_lastAt).inMilliseconds < 1200) {
-      return;
-    }
-    _lastCode = code;
-    _lastAt = now;
+  Future<void> _onCode(String code) async {
     final p = await ref.read(repoProvider).findByBarcode(code);
     if (!mounted) return;
     if (p != null) {
@@ -100,13 +68,13 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
         content: const Text('منتج غير مسجل'),
-        action: SnackBarAction(
-            label: 'إضافته', onPressed: () => _createNew(code)),
+        action:
+            SnackBarAction(label: 'إضافته', onPressed: () => _createNew(code)),
       ));
   }
 
   Future<void> _createNew(String code) async {
-    _stopScan();
+    setState(() => _scanning = false);
     await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => ProductForm(initialBarcode: code)));
     final p = await ref.read(repoProvider).findByBarcode(code);
@@ -186,7 +154,7 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
             userName: s!.userName,
           );
       refreshData(ref);
-      _stopScan();
+      setState(() => _scanning = false);
       await SoundService.play(Sfx.invoice);
       if (!mounted) return;
       await showDialog<void>(
@@ -233,11 +201,11 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(48)),
-                icon: Icon(_sc == null
-                    ? Icons.qr_code_scanner
-                    : Icons.stop_circle_outlined),
-                label: Text(_sc == null ? 'مسح الباركود' : 'إيقاف الكاميرا'),
-                onPressed: _toggleScan,
+                icon: Icon(_scanning
+                    ? Icons.stop_circle_outlined
+                    : Icons.qr_code_scanner),
+                label: Text(_scanning ? 'إيقاف الكاميرا' : 'مسح الباركود'),
+                onPressed: () => setState(() => _scanning = !_scanning),
               ),
             ),
             const SizedBox(width: 10),
@@ -254,14 +222,14 @@ class _PurchaseScreenState extends ConsumerState<PurchaseScreen> {
               ),
             ),
           ]),
-          if (_sc != null)
+          if (_scanning)
             Padding(
               padding: const EdgeInsets.only(top: 10),
               child: SizedBox(
-                height: 200,
+                height: 220,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: MobileScanner(controller: _sc!, onDetect: _onDetect),
+                  child: BarcodeCamera(onCode: _onCode),
                 ),
               ),
             ),
