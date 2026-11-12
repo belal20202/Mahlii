@@ -4,9 +4,11 @@ import '../models/invoice.dart';
 import '../models/product.dart';
 import '../repositories/invoice_repository.dart';
 import '../repositories/product_repository.dart';
+import '../repositories/receipt_repository.dart';
 
 final repoProvider = Provider((ref) => ProductRepository());
 final invoiceRepoProvider = Provider((ref) => InvoiceRepository());
+final receiptRepoProvider = Provider((ref) => ReceiptRepository());
 final tabProvider = StateProvider<int>((ref) => 0);
 final searchProvider = StateProvider<String>((ref) => '');
 final lowOnlyProvider = StateProvider<bool>((ref) => false);
