@@ -21,6 +21,19 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Disable Android lint-vital (JDK 17 lint bug)
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/disable-lint.gradle <<'EOF'
+          allprojects {
+            tasks.configureEach { t ->
+              if (t.name.startsWith('lintVital') || t.name.startsWith('lintAnalyze')) {
+                t.enabled = false
+              }
+            }
+          }
+          EOF
+
       - name: Generate Android platform files (if missing)
         run: |
           if [ ! -d android ]; then
