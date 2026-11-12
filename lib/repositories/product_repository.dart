@@ -17,9 +17,10 @@ class ProductRepository {
     final where = StringBuffer('deleted = 0');
     final args = <Object?>[];
     if (query.trim().isNotEmpty) {
-      where.write(' AND (name LIKE ? OR barcode LIKE ? OR internal_code LIKE ?)');
+      where.write(
+          ' AND (name LIKE ? OR barcode LIKE ? OR internal_code LIKE ? OR category LIKE ?)');
       final q = '%${query.trim()}%';
-      args.addAll([q, q, q]);
+      args.addAll([q, q, q, q]);
     }
     if (lowOnly) where.write(' AND qty_pieces < min_stock');
     final rows = await db.query(
@@ -37,17 +38,36 @@ class ProductRepository {
     final rows = await db.query(
       'products',
       where: 'barcode = ? AND deleted = 0',
-      whereArgs: [code],
+      whereArgs: [code.trim()],
       limit: 1,
     );
     return rows.isEmpty ? null : Product.fromMap(rows.first);
   }
 
-  Future<int> insert(Product p) async {
+  Future<List<String>> sections() async {
+    final db = await AppDb.get();
+    final r = await db.rawQuery('''
+      SELECT DISTINCT category FROM products
+      WHERE deleted = 0 AND category IS NOT NULL AND category != ''
+      ORDER BY category COLLATE NOCASE''');
+    return r.map((e) => e['category'] as String).toList();
+  }
+
+  Map<String, Object?> _fields(Product p) => {
+        'name': p.name,
+        'barcode': p.barcode,
+        'category': p.category,
+        'sale_price': p.salePrice,
+        'qty_pieces': p.qtyPieces,
+        'min_stock': p.minStock,
+        'image_path': p.imagePath,
+      };
+
+  Future<int> insert(Product p, {String? userName}) async {
     final db = await AppDb.get();
     try {
       return await db.transaction((txn) async {
-        final map = p.toMap()
+        final map = _fields(p)
           ..['created_at'] = _now
           ..['updated_at'] = _now
           ..['deleted'] = 0;
@@ -58,16 +78,15 @@ class ProductRepository {
           where: 'id = ?',
           whereArgs: [id],
         );
-        if (p.qtyPieces != 0) {
-          await txn.insert('stock_movements', {
-            'product_id': id,
-            'type': 'initial',
-            'delta_pieces': p.qtyPieces,
-            'note': 'رصيد افتتاحي',
-            'created_at': _now,
-          });
-        }
-        await _audit(txn, 'create', 'product', id, p.name);
+        await txn.insert('stock_movements', {
+          'product_id': id,
+          'type': 'initial',
+          'delta_pieces': p.qtyPieces,
+          'note': 'منتج جديد',
+          'user_name': userName,
+          'created_at': _now,
+        });
+        await _audit(txn, 'create', id, p.name);
         return id;
       });
     } on DatabaseException catch (e) {
@@ -76,15 +95,14 @@ class ProductRepository {
     }
   }
 
-  Future<void> update(Product p) async {
+  Future<void> update(Product p, {String? userName}) async {
     final db = await AppDb.get();
     try {
       await db.transaction((txn) async {
         final old = await txn.query('products',
             columns: ['qty_pieces'], where: 'id = ?', whereArgs: [p.id]);
         final oldQty = old.isEmpty ? 0 : old.first['qty_pieces'] as int;
-        final map = p.toMap()..['updated_at'] = _now;
-        map.remove('internal_code');
+        final map = _fields(p)..['updated_at'] = _now;
         await txn.update('products', map, where: 'id = ?', whereArgs: [p.id]);
         if (oldQty != p.qtyPieces) {
           await txn.insert('stock_movements', {
@@ -92,10 +110,11 @@ class ProductRepository {
             'type': 'adjust',
             'delta_pieces': p.qtyPieces - oldQty,
             'note': 'تعديل يدوي',
+            'user_name': userName,
             'created_at': _now,
           });
         }
-        await _audit(txn, 'update', 'product', p.id, p.name);
+        await _audit(txn, 'update', p.id, p.name);
       });
     } on DatabaseException catch (e) {
       if (e.isUniqueConstraintError()) throw DuplicateBarcodeException();
@@ -109,32 +128,7 @@ class ProductRepository {
     await db.transaction((txn) async {
       await txn.update('products', {'deleted': 1, 'updated_at': _now},
           where: 'id = ?', whereArgs: [id]);
-      await _audit(txn, 'delete', 'product', id, name);
-    });
-  }
-
-  /// بيع سريع بالقطعة (مؤقت حتى شاشة POS). يمنع البيع بأكثر من المتوفر.
-  Future<void> sellPieces(int id, int pieces) async {
-    final db = await AppDb.get();
-    await db.transaction((txn) async {
-      final rows = await txn.query('products',
-          columns: ['qty_pieces', 'name'], where: 'id = ?', whereArgs: [id]);
-      final qty = rows.first['qty_pieces'] as int;
-      if (qty < pieces) throw StateError('insufficient');
-      await txn.update(
-        'products',
-        {'qty_pieces': qty - pieces, 'updated_at': _now},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      await txn.insert('stock_movements', {
-        'product_id': id,
-        'type': 'sale',
-        'delta_pieces': -pieces,
-        'note': 'بيع سريع',
-        'created_at': _now,
-      });
-      await _audit(txn, 'sale', 'product', id, '$pieces قطعة');
+      await _audit(txn, 'delete', id, name);
     });
   }
 
@@ -142,18 +136,17 @@ class ProductRepository {
     final db = await AppDb.get();
     final r = await db.rawQuery('''
       SELECT COUNT(*) AS c,
-             COALESCE(SUM(cost_price * qty_pieces), 0) AS v,
              COALESCE(SUM(CASE WHEN qty_pieces < min_stock THEN 1 ELSE 0 END), 0) AS s
       FROM products WHERE deleted = 0''');
     final row = r.first;
-    return Stats(row['c'] as int, row['v'] as int, row['s'] as int);
+    return Stats((row['c'] as num).toInt(), (row['s'] as num).toInt());
   }
 
-  Future<void> _audit(DatabaseExecutor ex, String action, String entity,
-      int? id, String? details) {
+  Future<void> _audit(
+      DatabaseExecutor ex, String action, int? id, String? details) {
     return ex.insert('audit_log', {
       'action': action,
-      'entity': entity,
+      'entity': 'product',
       'entity_id': id,
       'details': details,
       'created_at': _now,
