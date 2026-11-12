@@ -27,6 +27,11 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     _items = ref.read(invoiceRepoProvider).items(widget.invoice.id);
   }
 
+  void _msg(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
   Future<void> _return() async {
     final s = ref.read(bootProvider).valueOrNull?.session;
     if (!canSell(s)) {
@@ -65,11 +70,6 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
     }
   }
 
-  void _msg(String m) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
-  }
-
   @override
   Widget build(BuildContext context) {
     final inv = widget.invoice;
@@ -103,12 +103,9 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                             color: AppColors.danger,
                             fontWeight: FontWeight.w800)),
                   ),
-                row('النوع', inv.isSale ? 'فاتورة بيع' : 'فاتورة شراء'),
                 row('التاريخ', fmtDateTime(inv.createdAt)),
                 if (inv.userName != null) row('الموظف', inv.userName!),
-                if (inv.party != null)
-                  row(inv.isSale ? 'العميل' : 'المورد', inv.party!),
-                row('طريقة الدفع', Invoice.methodLabels[inv.method] ?? '—'),
+                row('طريقة الدفع', 'نقدي'),
               ]),
             ),
           ),
@@ -145,13 +142,10 @@ class _InvoiceDetailScreenState extends ConsumerState<InvoiceDetailScreen> {
                 row('الخصم', iqd(inv.discount)),
                 row('الإجمالي', iqd(inv.total),
                     bold: true, color: AppColors.emerald),
-                row('المدفوع', iqd(inv.paid)),
-                if (inv.remaining > 0)
-                  row('المتبقي', iqd(inv.remaining), color: AppColors.danger),
               ]),
             ),
           ),
-          if (inv.isSale && inv.status == 'completed' && canSell(s)) ...[
+          if (inv.status == 'completed' && canSell(s)) ...[
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _return,
