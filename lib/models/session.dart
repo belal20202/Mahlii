@@ -5,7 +5,7 @@ class Session {
   final String storeId;
   final String storeName;
   final String userName;
-  final String role; // owner | manager | cashier | warehouse
+  final String role; // owner | manager | cashier (موظف) | warehouse
   final String plan;
   final DateTime start;
   final int planDays;
@@ -40,8 +40,8 @@ class Session {
   static const roleLabels = {
     'owner': 'مالك المحل',
     'manager': 'المدير',
-    'cashier': 'الكاشير',
-    'warehouse': 'موظف المخزن',
+    'cashier': 'موظف',
+    'warehouse': 'موظف',
   };
 
   String get roleLabel => roleLabels[role] ?? role;
