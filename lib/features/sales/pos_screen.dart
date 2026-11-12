@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/sound_service.dart';
 import '../../core/theme.dart';
@@ -8,6 +7,7 @@ import '../../core/units.dart';
 import '../../models/invoice.dart';
 import '../../models/product.dart';
 import '../../repositories/invoice_repository.dart';
+import '../../widgets/barcode_camera.dart';
 import '../../widgets/product_thumb.dart';
 import '../auth/auth_providers.dart';
 import '../invoices/invoice_detail_screen.dart';
@@ -26,14 +26,11 @@ class PosScreen extends ConsumerStatefulWidget {
 class _PosScreenState extends ConsumerState<PosScreen> {
   final _discount = TextEditingController();
   bool _saving = false;
-  MobileScannerController? _sc;
-  String? _lastCode;
-  DateTime _lastAt = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _scanning = false;
 
   @override
   void dispose() {
     _discount.dispose();
-    _sc?.dispose();
     super.dispose();
   }
 
@@ -44,26 +41,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       ..showSnackBar(SnackBar(content: Text(m)));
   }
 
-  void _toggleScan() {
-    if (_sc != null) {
-      final old = _sc;
-      setState(() => _sc = null);
-      WidgetsBinding.instance.addPostFrameCallback((_) => old?.dispose());
-    } else {
-      setState(() => _sc =
-          MobileScannerController(detectionSpeed: DetectionSpeed.normal));
-    }
-  }
-
-  Future<void> _onDetect(BarcodeCapture c) async {
-    final code = c.barcodes.isEmpty ? null : c.barcodes.first.rawValue;
-    if (code == null) return;
-    final now = DateTime.now();
-    if (code == _lastCode && now.difference(_lastAt).inMilliseconds < 1200) {
-      return;
-    }
-    _lastCode = code;
-    _lastAt = now;
+  Future<void> _onCode(String code) async {
     final p = await ref.read(repoProvider).findByBarcode(code);
     if (!mounted) return;
     if (p == null) {
@@ -207,22 +185,22 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(44)),
-                icon: Icon(_sc == null
-                    ? Icons.qr_code_scanner
-                    : Icons.stop_circle_outlined),
-                label: Text(_sc == null ? 'مسح باركود' : 'إيقاف الكاميرا'),
-                onPressed: _toggleScan,
+                icon: Icon(_scanning
+                    ? Icons.stop_circle_outlined
+                    : Icons.qr_code_scanner),
+                label: Text(_scanning ? 'إيقاف الكاميرا' : 'مسح باركود'),
+                onPressed: () => setState(() => _scanning = !_scanning),
               ),
             ),
           ]),
-          if (_sc != null)
+          if (_scanning)
             Padding(
               padding: const EdgeInsets.only(top: 10),
               child: SizedBox(
-                height: 200,
+                height: 220,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: MobileScanner(controller: _sc!, onDetect: _onDetect),
+                  child: BarcodeCamera(onCode: _onCode),
                 ),
               ),
             ),
