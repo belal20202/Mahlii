@@ -18,9 +18,9 @@ class AdminScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminScreenState extends ConsumerState<AdminScreen> {
-  final _plan = TextEditingController(text: 'شهري');
+  final _plan = TextEditingController(text: 'مجاني - شهر');
   final _days = TextEditingController(text: '30');
-  final _users = TextEditingController(text: '3');
+  final _users = TextEditingController(text: '5');
 
   @override
   void dispose() {
