@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/sound_service.dart';
@@ -17,8 +17,8 @@ import 'receipts_log_screen.dart';
 
 class _RLine {
   final Product product;
-  int qty;
-  _RLine(this.product, [this.qty = 1]);
+  int qty = 1;
+  _RLine(this.product);
 }
 
 /// إضافة بضاعة (مشتريات): امسح الباركود، ثم أكّد الإدخال ليُصدر رقم سجل.
