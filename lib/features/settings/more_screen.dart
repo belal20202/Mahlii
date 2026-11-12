@@ -6,6 +6,7 @@ import '../auth/auth_providers.dart';
 import '../invoices/invoices_screen.dart';
 import '../permissions.dart';
 import '../purchases/purchase_screen.dart';
+import '../purchases/receipts_log_screen.dart';
 import '../staff/staff_screen.dart';
 import '../subscription/subscription_screen.dart';
 
@@ -33,17 +34,24 @@ class MoreScreen extends ConsumerWidget {
         const SizedBox(height: 8),
         ListTile(
           leading: const Icon(Icons.receipt_long_outlined),
-          title: const Text('الفواتير'),
+          title: const Text('فواتير المبيعات'),
           trailing: const Icon(Icons.chevron_left),
           onTap: () => go(const InvoicesScreen()),
         ),
-        if (canPurchase(s))
+        if (canPurchase(s)) ...[
           ListTile(
-            leading: const Icon(Icons.local_shipping_outlined),
-            title: const Text('فاتورة شراء جديدة'),
+            leading: const Icon(Icons.inventory_outlined),
+            title: const Text('إضافة بضاعة'),
             trailing: const Icon(Icons.chevron_left),
             onTap: () => go(const PurchaseScreen()),
           ),
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('سجل المشتريات والإدخال'),
+            trailing: const Icon(Icons.chevron_left),
+            onTap: () => go(const ReceiptsLogScreen()),
+          ),
+        ],
         ListTile(
           leading: const Icon(Icons.workspace_premium_outlined),
           title: const Text('اشتراكي'),
