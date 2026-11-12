@@ -8,6 +8,7 @@ import '../../core/units.dart';
 import '../../models/invoice.dart';
 import '../../models/product.dart';
 import '../../repositories/invoice_repository.dart';
+import '../../widgets/product_thumb.dart';
 import '../auth/auth_providers.dart';
 import '../invoices/invoice_detail_screen.dart';
 import '../permissions.dart';
@@ -109,8 +110,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               onPressed: () => Navigator.pop(context, false),
               child: const Text('إلغاء')),
           FilledButton(
-              style: FilledButton.styleFrom(
-                  minimumSize: const Size(110, 44)),
+              style: FilledButton.styleFrom(minimumSize: const Size(110, 44)),
               onPressed: () => Navigator.pop(context, true),
               child: const Text('تأكيد وإصدار')),
         ],
@@ -267,54 +267,47 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Expanded(
-                child: Text(l.product.name,
+        child: Row(children: [
+          ProductThumb(path: l.product.imagePath, size: 44),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l.product.name,
                     style: const TextStyle(fontWeight: FontWeight.w700)),
-              ),
-              IconButton(
-                  onPressed: () => cart.remove(i),
-                  icon: const Icon(Icons.close, size: 20)),
-            ]),
-            Row(children: [
-              IconButton(
-                  onPressed: () {
-                    if (l.qty > 1) cart.setQty(i, l.qty - 1);
-                  },
-                  icon: const Icon(Icons.remove_circle_outline)),
-              Text('${l.qty}',
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w800)),
-              IconButton(
-                  onPressed: () {
-                    if (!cart.setQty(i, l.qty + 1)) {
-                      SoundService.play(Sfx.error);
-                      _msg('الكمية المتوفرة غير كافية');
-                    }
-                  },
-                  icon: const Icon(Icons.add_circle_outline)),
-              if (l.product.piecesPerCarton > 1)
-                TextButton(
-                  onPressed: () {
-                    if (!cart.switchUnit(i)) {
-                      SoundService.play(Sfx.error);
-                      _msg('الكمية المتوفرة غير كافية');
-                    }
-                  },
-                  child: Text(l.carton ? 'كرتون ⇄' : 'قطعة ⇄'),
-                ),
-              const Spacer(),
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Text(iqd(l.total),
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-              ),
-            ]),
-          ],
-        ),
+                Text(iqd(l.unitPrice),
+                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Row(children: [
+                  IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () {
+                        if (l.qty > 1) cart.setQty(i, l.qty - 1);
+                      },
+                      icon: const Icon(Icons.remove_circle_outline)),
+                  Text('${l.qty}',
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w800)),
+                  IconButton(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () {
+                        if (!cart.setQty(i, l.qty + 1)) {
+                          SoundService.play(Sfx.error);
+                          _msg('الكمية المتوفرة غير كافية');
+                        }
+                      },
+                      icon: const Icon(Icons.add_circle_outline)),
+                  const Spacer(),
+                  Text(iqd(l.total),
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                ]),
+              ],
+            ),
+          ),
+          IconButton(
+              onPressed: () => cart.remove(i),
+              icon: const Icon(Icons.close, size: 20)),
+        ]),
       ),
     );
   }
